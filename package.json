@@ -1,0 +1,39 @@
+{
+  "name": "mediabot",
+  "version": "1.0.0",
+  "description": "automated media manager",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc -w --preserveWatchOutput"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BlunterMonk/Mediabot.git"
+  },
+  "author": "Dahmitri Stephenson",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/BlunterMonk/Mediabot/issues"
+  },
+  "homepage": "https://github.com/BlunterMonk/Mediabot#readme",
+  "dependencies": {
+    "koa": "^2.7.0",
+    "@types/node": "^14.0.5",
+    "anidbjs": "^2.4.1",
+    "bencode": "^2.0.1",
+    "cross-spawn": "^7.0.3",
+    "danbooru": "^3.1.0",
+    "fs": "0.0.1-security",
+    "http": "0.0.1-security",
+    "https": "^1.0.0",
+    "node-tvdb": "^4.1.0",
+    "rss-parser": "^3.8.0",
+    "video-thumbnail-generator": "^1.1.3",
+    "winston": "^3.2.1"
+  },
+  "devDependencies": {
+    "@types/koa": "^2.0.48",
+    "typescript": "^3.3.3333"
+  }
+}
