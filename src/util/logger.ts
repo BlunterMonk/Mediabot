@@ -23,7 +23,7 @@ class Logger {
     constructor() {
         let config = JSON.parse(fs.readFileSync(configFile).toString());
     
-        this.init(config.Name, config.loglevel);
+        this.init(config.name, config.logLevel);
     }
 
     init(name: string, level: string) {

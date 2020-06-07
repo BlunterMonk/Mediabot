@@ -20,6 +20,7 @@ export interface downloadOptions {
     destination: string; // destination file path
 }
 
+// Returns file extension including .
 export function getFileExtension(path: string): string {
     return path.substring(path.lastIndexOf("."), path.length);
 }
@@ -98,6 +99,12 @@ export function downloadFileIfNotExist(path, link): Promise<string> {
     
     if (fs.existsSync(path))
         return Promise.resolve(path);
+
+    let p = path.slice(0, path.lastIndexOf("/"));
+    if (!fs.existsSync(p)) {
+        log("Creating directory: ", p);
+        fs.mkdirSync(p, { recursive: true });
+    }
 
     return downloadFile(path, link);
 }

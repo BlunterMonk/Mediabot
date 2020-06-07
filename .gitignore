@@ -1,4 +1,9 @@
 node_modules/
 dist/
 log/
+test/
+config/api-keys.json
 **/*.DS_Store
+data/
+public/data
+.vscode/

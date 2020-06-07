@@ -8,27 +8,40 @@ import "./string-extension.js";
 import * as fs from "fs";
 import * as https from "https";
 import { log, error, trace, debug, compareStrings } from "../global.js";
-import { downloadOptions } from "./download.js";
 import Parser from "rss-parser";
 
+const cacheFile = `./data/downloads.json`;
 ////////////////////////////////////////////////////////////
 
 let parser = new Parser();
 
-export type rssItem = torrentFilter;
-
-type OnUpdate = ((targetDir: string, links: downloadOptions[], whiteList: string[]) => void);
+type OnUpdate = ((targetDir: string, links: rssLink[]) => void);
 interface torrentFilter {
-    filter: string;
-    destination: string;
+    filter: string; // Regex match performed on the raw titles found in the feed
+    replace?: string; // Regex replace performed on the titles before returned
+    destination: string; // Download location for matched titles
 }
 interface rssConfig {
     source: string; // RSS feed source URL
+    enabled: boolean; // Should the RSS feed be active on startup
 	targetDirectory: string; // parent target for sorting shows
     interval: number; // interval to read from RSS stream in seconds
     ignoreList: string[]; // list of tags to ignore
     whiteList: string[]; // list of tags that should be grabbed by the feed but not downloaded
     acceptList: torrentFilter[]; // list of accepted tags
+}
+interface rssItem {
+    link: string; // Download link
+    title: string; // RSS Item title
+    content: string; // RSS Item content
+    destination: string; // Item download location
+}
+export interface rssLink {
+    title: string; // title from rss feed entry
+    source: string; // source URL of the file 
+    magnet?: string; // if present, uses the magnet link to download the file
+    destination: string; // destination file path
+    whiteListed: boolean; // This file should be downloaded
 }
 export class RSSFeed {
     // downloadList: {[key:string]: string}; // list of items already claimed from the RSS field
@@ -40,6 +53,11 @@ export class RSSFeed {
         this.reload();
     }
     startReading(onUpdate: OnUpdate) {
+        if (!this.configuration.enabled) {
+            debug("RSS Feed Disabled: ", this.filename);
+            return;
+        }
+
         this.stopReading();
 
         this.updateFeed(onUpdate);
@@ -68,42 +86,44 @@ export class RSSFeed {
     }
 
     updateFeed(onUpdate: OnUpdate) {
-        readFeed(this.configuration.source, this.configuration.acceptList, this.configuration.ignoreList, this.configuration.whiteList)
+        readFeed(this.configuration.source, this.configuration.acceptList, this.configuration.ignoreList)
         .then(items => {
             if (items.length == 0) {
                 debug("No torrents found from RSS feed");
                 return;
             }
 
-            var downloadList: {[key:string]: string} = JSON.parse(fs.readFileSync(`./data/downloads.json`).toString());
+            var downloadList: {[key:string]: string} = JSON.parse(fs.readFileSync(cacheFile).toString());
 
-            let links: downloadOptions[] = [];
+            let links: rssLink[] = [];
             items.forEach(item => {
                 var title = item.title.toLowerCase().replaceAll(" ", "_");
                 if (downloadList[title])
                     return;
 
-                let name = item.title.slice(0, item.title.lastIndexOf("."));
                 let m = item.content.match(/\"(magnet.*?)\"/g);
                 let mag = null;
                 if (m && m.length > 0)
                     mag = m[0];
-                
+
+                const entry = this.configuration.whiteList.find((v, i) => {
+                    return compareStrings(item.title, v)
+                });
+    
                 let options = {
                     title: item.title,
-                    filename: name,
                     source: item.link,
                     magnet: mag,
-                    destination: item.destination
+                    destination: item.destination,
+                    whiteListed: (entry != null)
                 };
-                debug("Downloading: ", options);
 
                 links.push(options);
-                downloadList[title] = item.link;
+                downloadList[title] = (mag) ? mag : item.link;
             });
 
             if (links.length > 0) {
-                onUpdate(this.getTargetDirectory(), links, this.configuration.whiteList);
+                onUpdate(this.getTargetDirectory(), links);
             }
 
             fs.writeFileSync(`./data/downloads.json`, JSON.stringify(downloadList, null, "\t"));
@@ -224,10 +244,10 @@ class rssManager {
 
 export const RSSManager = new rssManager();
 
-async function readFeed(source: string, acceptList: torrentFilter[], ignoreList: string[], whiteList: string[]): Promise<Parser.Item> {
+async function readFeed(source: string, acceptList: torrentFilter[], ignoreList: string[]): Promise<rssItem[]> {
 
     let feed = await parser.parseURL(source);
-    let links : Parser.Item[] = [];
+    let links : rssItem[] = [];
     
     console.log("Found Items: " + feed.items.length);
 
@@ -246,9 +266,15 @@ async function readFeed(source: string, acceptList: torrentFilter[], ignoreList:
             const filter = acceptList[index].filter;
             const title = item.title.toLowerCase();
 
+            debug("Compare: ", title, " <-> ", filter);
             if (compareStrings(title, filter)) {
                 debug("Adding Item from RSS feed: ", item.title, " url: ", item.link);
-                item.destination = acceptList[index].destination
+                if (acceptList[index].replace) {
+                    let o = item.title;
+                    let n = item.title.replace(new RegExp(acceptList[index].replace), "");
+                    debug("Item Title changed: ", o, " -> ", n);
+                    item.title = n;
+                }
                 //for (let i = 0; i < whiteList.length; i++) {
                 //    const e = whiteList[i];
                 //    if (compareStrings(title, e)) {
@@ -257,7 +283,12 @@ async function readFeed(source: string, acceptList: torrentFilter[], ignoreList:
                 //    }
                 //}
 
-                links.push(item);
+                links.push({
+                    link: item.link,
+                    title: item.title,
+                    content: item.content,
+                    destination: acceptList[index].destination
+                });
                 debug("Total Links: ", links.length);
                 return;
             }

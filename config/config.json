@@ -1,4 +1,8 @@
 {
-    "Name": "Mediabot",
-    "loglevel": "silly"
+    "name": "Mediabot",
+    "logLevel": "silly",
+    "downloadDir": "./downloads/",
+    "mediaDir": "/Users/dahmitristephenson/Movies/",
+    "cacheDir": "./data/",
+    "cacheLimit": 25
 }

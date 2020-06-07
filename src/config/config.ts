@@ -11,8 +11,16 @@ import "../util/string-extension.js";
 
 const filename = './config/config.json';
 
+interface configuration {
+    name: string; // App name
+    logLevel: string; // App log level (error, warn, debug, info, silly)
+    downloadDir: string; // Directory where files should be stored before sorting
+    mediaDir: string; // Root folder of media folder where downloads will be sorted into
+    cacheDir: string; // Location to store cached video metadata and images
+    cacheLimit: number; // Amount of episodes that should remain in the RSS cache
+}
 export class config {
-    configuration: any;
+    configuration: configuration;
     serverSettings: any;
     constructor() {
         this.init();
@@ -26,61 +34,19 @@ export class config {
         var newData = JSON.stringify(this.configuration, null, "\t");
         fs.writeFileSync(filename, newData);
     }
-    
     reload() {
         var data = fs.readFileSync(filename);
         this.configuration = JSON.parse(data.toString());
     }
 
-    alias() {
-        return this.configuration.unitAliases;
+    getMediaDir(): string {
+        return this.configuration.mediaDir;
     }
-    filetypes() {
-        return this.configuration.filetypes;
+    getCacheDir(): string {
+        return this.configuration.cacheDir;
     }
-
-    // COMMAND ALIASES
-    getCommandAlias(name: string) {
-        name = name.toLowerCase();
-        if (!this.configuration.commandAliases || !this.configuration.commandAliases[name])
-            return null;
-            
-        return this.configuration.commandAliases[name];
-    }
-    setCommandAlias(name: string, command: string) {
-        name = name.toLowerCase().replaceAll(" ", "_");
-
-        this.configuration.commandAliases[name] = command;
-        this.save();
-        return true;
-    }
-
-    // SHORTCUTS
-    getShortcut(name: string) {
-        name = name.toLowerCase();
-        if (!this.configuration.shortcuts || !this.configuration.shortcuts[name])
-            return null;
-            
-        return this.configuration.shortcuts[name];
-    }
-    setShortcut(name: string, command: string) {
-        name = name.toLowerCase();
-
-        if (!this.configuration[`shortcuts`]) {
-            this.configuration[`shortcuts`] = {}
-        }
-
-        this.configuration.shortcuts[name] = command;
-        this.save();
-        return true;
-    }
-
-    getEmbedTemplate() {
-        return this.configuration.embed;
-    }
-
-    getDownloadLocation(): string {
-        return this.configuration.drive;
+    getDownloadDir(): string {
+        return this.configuration.downloadDir;
     }
 
 };
