@@ -1,0 +1,101 @@
+/* width */
+
+::-webkit-scrollbar {
+    width: 5px;
+}
+
+/* Track */
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* Handle */
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+}
+
+/* Handle on hover */
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+.feed {
+    padding: 5px;
+    /* overflow: scroll; */
+    /* width: 90%; */
+    /* background-color: black; */
+}
+
+.feed-item {
+    /* padding-right: 5px; */
+    border-radius: 10px;
+    background-color: #010101;
+    /* max-height: 216px; */
+    min-height: 230px;
+}
+
+.feed-item>p {
+    color: #f0ece2;
+    stroke: black;
+    width: auto;
+}
+
+.feed-item-thumb {
+    overflow: hidden;
+    border-top-left-radius: 10px;
+    border-bottom-left-radius: 10px;
+    /* position: relative; */
+    border-right: black;
+    position: relative;
+    width: 100%;
+    flex: 0 0 41.666667%;
+    max-width: 41.666667%;
+}
+
+.feed-item-thumb img {
+    border-top-left-radius: 10px;
+    border-bottom-left-radius: 10px;
+}
+
+.feed-item-info {
+    /* width: 60%; 
+height: 100%; 
+float: right; */
+    overflow: hidden;
+    background-color: #393e46;
+    /* #2C2F33;*/
+    stroke: black;
+    border-top-right-radius: 10px;
+    border-bottom-right-radius: 10px;
+    flex-basis: 0;
+    flex-grow: 1;
+    width: 100%;
+    max-width: 100%;
+    padding-left: 5px;
+    padding-right: 5px;
+    position: relative;
+}
+
+.feed-item-title {
+    border-bottom: solid black;
+    position: relative;
+    height: 20%;
+}
+
+.feed-item-episode-title {
+    height: 20%;
+    position: relative;
+    white-space: nowrap;
+}
+
+.feed-item-text {
+    position: absolute;
+    overflow: hidden;
+    height: 60%;
+    overflow-y: auto;
+    /* padding-bottom: 30px; */
+    /* width: 100%; */
+}
