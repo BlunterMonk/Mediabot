@@ -1,0 +1,56 @@
+{
+	"source": "https://www.tokyotosho.info/rss.php?searchName=true&searchComment=true&terms=horriblesubs+mkv",
+	"enabled": true,
+	"type": "Anime",
+	"targetDirectory": "D:\\Ongoing Anime\\",
+	"interval": 1800,
+	"ignoreList": [
+		"1080p",
+		"480p",
+		"naruto",
+		"boruto",
+		"batch"
+	],
+	"whiteList": [
+		"- 01",
+		"pet",
+		"eizouken",
+		"seton",
+		"bang dream",
+		"stone",
+		"assassin",
+		"watashi",
+		"azur lane",
+		"fate grand",
+		"honzuki",
+		"chihayafuru",
+		"one piece",
+		"orphen",
+		"omoimasu",
+		"number24",
+		"hanako",
+		"infinite",
+		"hakaishin",
+		"richard",
+		"hatena",
+		"kyokou suiri",
+		"invaded",
+		"runway",
+		"budoukan",
+		"nekopara",
+		"Devil",
+		"kaguya",
+		"princess",
+		"hamefura"
+	],
+	"acceptList": [
+		{
+			"filter": "HorribleSubs*S2*720p*.mkv",
+			"destination": "D:/_episodes/S2"
+		},
+		{
+			"filter": "HorribleSubs*720p*.mkv",
+			"destination": "D:/_episodes"
+		}
+	]
+}

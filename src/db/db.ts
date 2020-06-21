@@ -21,6 +21,7 @@ export interface EpisodeMetadata {
     thumb: string; // thumbnail filename
     season: number; // season number
     episode: number; // episode number
+    absEpisode: number; // absolute episode number
     overview: string; // Detailed episode overview
     seriesId: string; // ID of series
     seriesTitle: string; // Series Title
@@ -33,6 +34,7 @@ export interface EpisodeMetadata {
 export interface SeriesMetadata {
     // Identifiers
     id: number; // TVDB series ID
+    lastUpdated: number; // The last time this set of data has been cached
     aliases: string[]; // Alternate Series Titles
     seriesName: string; // Series Title
     

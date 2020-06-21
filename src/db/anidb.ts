@@ -7,7 +7,7 @@
 import "../util/string-extension.js";
 import * as fs from "fs";
 import * as https from "https";
-import { log, error, debug, trace } from "../global.js";
+import { log, error, debug, warn, trace, newTimestamp } from "../global.js";
 import { downloadFile, downloadFileIfNotExist, getFileExtension, getFilePath } from "../util/download.js";
 import { SearchInfo, EpisodeMetadata, SeriesMetadata } from "./db.js";
 import { Config } from "../config/config";
@@ -23,7 +23,7 @@ const seriesKeysFilename = "./data/anime-metadata/keys.json";
 var titleDump: string = null;
 var titleList: string[] = null;
 
-function getMetadataPath() { return `${Config.getCacheDir()}anidb-metadata/`; };
+export function getMetadataPath() { return `${Config.getCacheDir()}anidb-metadata/`; };
 
 ////////////////////////////////////////////////////////////
 // PARSING
@@ -142,6 +142,27 @@ function getAnimeID(name: string): string {
     return match[1];
 }
 
+// Decide if the series metadata should be recached
+function shouldCache(series: SeriesMetadata): boolean {
+
+    let t0 = series.lastUpdated;
+    let t1 = newTimestamp();
+
+    if (!t0) 
+        return true;
+        
+    if (t1 > t0) { 
+        // it's sooner than one week ago
+        let diff = t1 - t0;
+        let days = Math.floor(diff / 86400); // 86400 = seconds per day
+        let hours = Math.floor((diff - days * 86400) / 3600); // 3600 = seconds per hour
+        let totalHours = Math.floor(diff / 3600); 
+        debug(`Series last cached ${days} day(s) and ${hours} hour(s) ago`);
+        return (totalHours >= Config.getCacheTimer())
+    }
+    
+    return false;
+}
 
 //////////////////////////////////////////////////
 // CACHED DATA
@@ -176,10 +197,21 @@ export function getEpisodeMetadata(seriesID: string, episode: number, season: nu
         }
     }
 
+    // Try finding the episode with absolute number
+    for (let index = 0; index < series.episodes.length; index++) {
+        const ep = series.episodes[index];
+        
+        if (ep.season <= season && ep.absEpisode == episode) {
+            warn("Returning episode with Absolute Number: ", episode, " Metadata: ", ep);
+            return ep;
+        }
+    }
+
     return null;
 }
 
 export function getEpisodeThumbnail(seriesId: string, episodeId: string): string {
+    return `${getMetadataPath()}${seriesId}/thumb_${episodeId}.jpg`;
     let p = `${getMetadataPath()}${seriesId}/thumb_${episodeId}.jpg`;
     if (!fs.existsSync(p))
         return null;
@@ -187,6 +219,7 @@ export function getEpisodeThumbnail(seriesId: string, episodeId: string): string
     return p;
 }
 export function getSeriesPoster(seriesId: string): string {
+    return `${getMetadataPath()}${seriesId}/poster.jpg`;
     let p = `${getMetadataPath()}${seriesId}/poster.jpg`;
     if (!fs.existsSync(p))
         return null;
@@ -194,6 +227,7 @@ export function getSeriesPoster(seriesId: string): string {
     return p;
 }
 export function getSeriesBanner(seriesId: string): string {
+    return `${getMetadataPath()}${seriesId}/banner.jpg`;
     let p = `${getMetadataPath()}${seriesId}/banner.jpg`;
     if (!fs.existsSync(p))
         return null;
@@ -213,18 +247,22 @@ export function cacheSeriesMetadata(title: string): Promise<string> {
         return Promise.reject("Unable to find ID for title: " + title)
     }
 
-    var info = loadRaw(id);
-    if (info) {
+    var info = load(id);
+    if (info && !shouldCache(info)) {
         log("Recaching saved file");
-        return cacheMetadata(info);
+        return Promise.resolve(`${info.id}`);
     }
 
     return new Promise<string>((resolve, reject) => {setTimeout(() => {
 
         client.anime(id)
         .then(info => {
+            debug("Downloaded Anime info from AniDB: ", info.id);
+
             saveRaw(info);
-            cacheMetadata(info);
+            cacheMetadata(info)
+            .then(resolve)
+            .catch(reject);
         })
         .catch(reject);
 
@@ -242,15 +280,15 @@ function cacheMetadata(series: AniDB.seriesMetadata): Promise<string> {
         fs.mkdirSync(seriesPath, {recursive:true});
 
     // download main series poster
-    saveImage(series.id, series.picture, "poster");
+    // saveImage(series.id, series.picture, "poster");
     
-
     return new Promise<string>((resolve, reject) => {
         debug("Searching for series season");
 
         getOriginalSeries(series)
         .then(({original, prequels, sequels}) => {
             
+            let time = newTimestamp();
             let season = Object.keys(prequels).length + 1;
 
             // Get main title
@@ -262,21 +300,26 @@ function cacheMetadata(series: AniDB.seriesMetadata): Promise<string> {
             debug("Series Season: " + season);
 
             let episodes: EpisodeMetadata[] = [];
+            let absEp = 0;
 
             // Add episodes from previous seasons
             let preKeys = Object.keys(prequels).sort(); // This is not fullproof and may fail but it's probably ok
             preKeys.forEach((pk, ind) => {
-                var e: EpisodeMetadata[] = getEpisodes(prequels[pk], originalTitle, (ind+1));
+                var e: EpisodeMetadata[] = getEpisodes(prequels[pk], originalTitle, (ind+1), absEp);
+                absEp = absEp + e.length;
                 episodes = episodes.concat(e);
             });
 
             // Add current season episodes
-            episodes = episodes.concat(getEpisodes(series, originalTitle, season));
+            let current = getEpisodes(series, originalTitle, season, absEp);
+            absEp = absEp + current.length;
+            episodes = episodes.concat(current);
 
             // Add episodes from sequels
             let seqKeys = Object.keys(sequels).sort();
             seqKeys.forEach((sk, ind) => {
-                var e: EpisodeMetadata[] = getEpisodes(sequels[sk], originalTitle, season + (ind+1));
+                var e: EpisodeMetadata[] = getEpisodes(sequels[sk], originalTitle, season + (ind+1), absEp);
+                absEp = absEp + e.length;
                 episodes = episodes.concat(e);
             });
 
@@ -288,6 +331,7 @@ function cacheMetadata(series: AniDB.seriesMetadata): Promise<string> {
             // Populate series metadata
             var metadata: SeriesMetadata = {
                 id: original.id,
+                lastUpdated: time,
                 aliases: aliases,
                 seriesName: originalTitle,
                 startDate: series.startDate,
@@ -372,6 +416,8 @@ function getOriginalSeries(info: AniDB.seriesMetadata): Promise<getOriginalSerie
         log("Begin search for prequels: ", info.id);
 
         getSiblings(info, "Prequel", {}, (o1) => {
+        
+            log("Begin search for sequels: ", info.id);
             getSiblings(info, "Sequel", {}, (o2) => {
                 resolve({
                     original: o1.final,
@@ -434,7 +480,7 @@ function getSiblings(info: AniDB.seriesMetadata, type: string, parsedList: listM
 }
 
 // Parse the episodes from the AniDB metadata into EpisodeMetadata
-function getEpisodes(series: AniDB.seriesMetadata, title: string, season: number): EpisodeMetadata[] {
+function getEpisodes(series: AniDB.seriesMetadata, title: string, season: number, abs: number): EpisodeMetadata[] {
     return series.episodes.map(ep => {
         let n = ep.titles.find(t => {
             return t.language == "en";
@@ -447,6 +493,7 @@ function getEpisodes(series: AniDB.seriesMetadata, title: string, season: number
             thumb: null, // AniDB does not store thumbnails
             season: season, // season number
             episode: parseInt(ep.episodeNumber),
+            absEpisode: abs + parseInt(ep.episodeNumber), 
             overview: ep.summary,
             seriesId: `${series.id}`,
             seriesTitle: title
@@ -481,6 +528,8 @@ function saveRaw(series: AniDB.seriesMetadata) {
     var seriesPath = getMetadataPath() + `${id}/`;
     var path = seriesPath + `${id}.raw.json`;
 
+    debug("Saving raw AniDB info to: ", path);
+
     // create series path if it doesn't exist
     if (!fs.existsSync(seriesPath))
         fs.mkdirSync(seriesPath, {recursive:true});
@@ -491,11 +540,28 @@ function saveRaw(series: AniDB.seriesMetadata) {
 }
 
 // return cached metadata if it exists
+function load(id: string): SeriesMetadata {
+    var seriesPath = getMetadataPath() + `${id}/`;
+    var path = seriesPath + `${id}.json`;
+    
+    if (fs.existsSync(path)) {
+        debug("Loading raw AniDB info from: ", path);
+
+        var dump = fs.readFileSync(path).toString();
+        return JSON.parse(dump);
+    }
+
+    return null;
+}
+
+// return cached metadata if it exists
 function loadRaw(id: string): AniDB.seriesMetadata {
     var seriesPath = getMetadataPath() + `${id}/`;
     var path = seriesPath + `${id}.raw.json`;
     
     if (fs.existsSync(path)) {
+        debug("Loading raw AniDB info from: ", path);
+
         var dump = fs.readFileSync(path).toString();
         return JSON.parse(dump);
     }

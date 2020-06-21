@@ -54,6 +54,20 @@
     flex: 0 0 41.666667%;
     max-width: 41.666667%;
 }
+.feed-item-poster {
+    overflow: hidden;
+    border-top-left-radius: 10px;
+    border-bottom-left-radius: 10px;
+    border-right: black;
+    position: relative;
+    /* width: 100%; */
+    /* flex: 0 0 41.666667%; */
+    /* max-width: 41.666667%; */
+}
+.feed-item-poster > img {
+    height: 230px;
+    width: auto;
+}
 
 .feed-item-thumb img {
     border-top-left-radius: 10px;

@@ -1,0 +1,15 @@
+{
+	"source": "https://sukebei.nyaa.si/?page=rss&c=1_1&f=0",
+	"enabled": false,
+	"type": "Anime",
+	"targetDirectory": "D:\\_h",
+	"interval": 10,
+	"ignoreList": [],
+	"announceList": [],
+	"acceptList": [
+		{
+			"filter": "SakuraCircle",
+			"destination": "D:/_h"
+		}
+	]
+}

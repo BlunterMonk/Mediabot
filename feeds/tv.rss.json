@@ -1,0 +1,21 @@
+{
+	"source": "https://www.limetorrents.info/searchrss/stargirl%201080p%20TGx/",
+	"enabled": false,
+	"type": "TV",
+	"targetDirectory": "D:\\TV\\",
+	"interval": 1800,
+	"ignoreList": [
+		"720p",
+		"480p"
+	],
+	"whiteList": [
+        "stargirl"
+	],
+	"acceptList": [
+		{
+            "filter": "Stargirl*S[0-9]+E[0-9]+1080p",
+            "replace": "\\s1080p.*",
+			"destination": "D:/_episodes"
+		}
+	]
+}

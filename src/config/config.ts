@@ -18,6 +18,7 @@ interface configuration {
     mediaDir: string; // Root folder of media folder where downloads will be sorted into
     cacheDir: string; // Location to store cached video metadata and images
     cacheLimit: number; // Amount of episodes that should remain in the RSS cache
+    cacheTimer: number; // Total number of hours before a series should be recached
 }
 export class config {
     configuration: configuration;
@@ -47,6 +48,11 @@ export class config {
     }
     getDownloadDir(): string {
         return this.configuration.downloadDir;
+    }
+
+    // Time in hours when a series should be recached
+    getCacheTimer(): number {
+        return this.configuration.cacheTimer;
     }
 
 };

@@ -61,6 +61,9 @@ class Logger {
     debug(data: string) {
         this.logger.debug(data);
     }
+    warn(data: string) {
+        this.logger.warn(data);
+    }
     silly(data: string) {
         this.logger.silly(data);
     }

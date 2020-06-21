@@ -6,9 +6,9 @@
 //////////////////////////////////////////
 
 import "../util/string-extension.js";
-import { log, error, compareStrings, debug } from "../global.js";
+import { log, error, compareStrings, debug, newTimestamp } from "../global.js";
 import * as RSS from "../util/rss.js";
-import { downloadTorrent, downloadMagnetFile, TorrentResult } from "../util/torrent.js";
+import { downloadTorrent, downloadMagnetFile, TorrentResult, downloadTorrentFile } from "../util/torrent.js";
 import { downloadFile, downloadBulkFiles, downloadOptions, getFileExtension, getFilePath } from "../util/download.js";
 import * as fs from "fs";
 import { generateThumb } from "../util/thumbs.js";
@@ -18,7 +18,7 @@ import { Config } from "../config/config";
 import { EpisodeMetadata } from "../db/db.js";
 
 // TODO: add these to config file
-const cacheFilename = `rss-cache.json`;
+const cacheFilename = `episode-cache.json`;
 const imageTypes = [".png", ".jpg"];
 
 
@@ -29,12 +29,24 @@ interface CacheEntry {
     rssLink: string; // Download URL of the file
     rssTitle: string; // Original title of RSS item
     timestamp: number; // Time of download
+    whiteListed: boolean; // Should this entry be downloaded
+}
+interface EpisodeCache {
+    [key: string]: EpisodeMetadata
 }
 
 
 
-
 //////////////////////////////////////////
+
+export function GetCache(): EpisodeCache {
+    if (!fs.existsSync(Config.getCacheDir() + "/" + cacheFilename)) {
+        error("Episode Cache Not Found!");
+        return null;
+    }
+    
+    return JSON.parse(fs.readFileSync(cacheFilename).toString());
+}
 
 // return an image with any extension
 function resolveImage(dir, name) {
@@ -56,7 +68,8 @@ function resolveImage(dir, name) {
 export function Init() {
     log("Starting RSS Feeds");
     RSS.RSSManager.init();
-    RSS.RSSManager.startReading("nyaa", cacheNewAnime);
+    RSS.RSSManager.startAll(cacheNewAnime, cacheNewEpisodes);
+    // RSS.RSSManager.startReading("nyaa", cacheNewAnime);
     // RSS.RSSManager.startReading("tv", cacheNewEpisodes);
     //RSS.RSSManager.startReading("golumpa", downloadNewEpisodes);
     //RSS.RSSManager.startReading("sakura", downloadNewH);
@@ -69,14 +82,14 @@ function sendNewEpisodeMessage(metadata: EpisodeMetadata) {
 }
 
 
-export function cacheNewAnime(targetDir: string, links: RSS.rssLink[]) {
-    cacheNew(targetDir, links, AniDB);
+export function cacheNewAnime(mediaType: string, links: RSS.rssLink[]) {
+    cacheNew(mediaType, links, AniDB);
 }
-export function cacheNewEpisodes(targetDir: string, links: RSS.rssLink[]) {
-    cacheNew(targetDir, links, TVDB);
+export function cacheNewEpisodes(mediaType: string, links: RSS.rssLink[]) {
+    cacheNew(mediaType, links, TVDB);
 }
 
-function cacheNew(targetDir: string, links: RSS.rssLink[], adapter) {
+function cacheNew(mediaType: string, links: RSS.rssLink[], adapter) {
 
     var precache = {};
     var metas = links.map(m => {
@@ -94,28 +107,46 @@ function cacheNew(targetDir: string, links: RSS.rssLink[], adapter) {
 
         entries.forEach(entry => {
             let key = entry.key;
-            if (!key) {
+            if (!key || !entry.whiteListed) {
                 // TODO: download whitelisted titles but don't sort them
                 return;
             }
 
             let series = adapter.getSeriesMetadata(entry.seriesId);
             let episode = series.episodes.find(e => { return e.id == entry.episodeId; });
-            let thumb = adapter.getEpisodeThumbnail(entry.seriesId, entry.episodeId);
+            let thumb: string = adapter.getEpisodeThumbnail(entry.seriesId, entry.episodeId);
             let poster = adapter.getSeriesPoster(entry.seriesId);
             let banner = adapter.getSeriesBanner(entry.seriesId);
-            
+                        
             let ce: any = episode;
-            ce.thumb = thumb;
-            ce.poster = poster;
-            ce.banner = banner;
+            ce.thumb = thumb.slice(thumb.indexOf("/data/"), thumb.length);
+            ce.poster = poster.slice(poster.indexOf("/data/"), poster.length);
+            ce.banner = banner.slice(banner.indexOf("/data/"), banner.length);
             ce.timestamp = entry.timestamp;
 
             debug("Added to cache: ", key, " data: ", ce);
+
             cache[key] = ce;
+
+            log("Downloading Episode: ", key);
+
+            // Begin torrent download for this episode
+            downloadTorrentWithURL(entry, episode)
+            .then(output => {
+                let file = ApplyMetadata(Config.getMediaDir(), mediaType, episode, output.result);
+                if (file) {
+                    log("Successfully sorted episode: ", file);
+                }
+
+                if (!fs.existsSync(thumb)) {   
+                    genThumb(output.entry, file, adapter.getMetadataPath() + output.entry.seriesId + "/");
+                }
+            })
+            .catch(e => {
+                error("Failed to download episode: ", e);
+            });
         });
 
-        log("Final Cache: ", cache);
         fs.writeFileSync(cacheFile, JSON.stringify(cache));
     })
     .catch(e => {
@@ -130,7 +161,8 @@ function retrieveLinkMetadata(link: RSS.rssLink, cache, adapter): Promise<CacheE
         episodeId: null,
         rssLink: (link.magnet) ? link.magnet : link.source,
         rssTitle: link.title,
-        timestamp: Math.floor(Date.now() / 1000),
+        timestamp: newTimestamp(),
+        whiteListed: false
     };
 
     var info = adapter.resolveName(link.title);
@@ -144,8 +176,10 @@ function retrieveLinkMetadata(link: RSS.rssLink, cache, adapter): Promise<CacheE
     // add current batch to precache, this will also ensure no duplicates are cached during the same batch
     var key = `${info.title.toLowerCase().replace(/\s/g, "_")}_s${info.season}e${info.episode}`;
     entry.key = key;
+    entry.whiteListed = link.whiteListed;
 
     if (!link.whiteListed) {
+        debug("Discarding episode metadata, series not white listed");
         return Promise.resolve(entry);
     }
     
@@ -178,118 +212,83 @@ function retrieveLinkMetadata(link: RSS.rssLink, cache, adapter): Promise<CacheE
     });
 }
 
+export function genThumb(entry: CacheEntry, videoFile: string, metaPath: string) {
+    log("Generating Thumbnail From: ", videoFile, " In: ", metaPath);
 
-
-
-
-function downloadNewEpisodes(targetDir: string, links: RSS.rssLink[]) {
-
-    if (links.length == 0) {
-        log("No new torrents");
-        return;
-    }
-
-    log("Batch of RSS torrents found: ", links);
-    downloadBulkAnime(targetDir, links);
+    generateThumb(videoFile, metaPath, entry.episodeId)
+    .then(thumb => {
+        log("Successfully Generated Thumbnail: ", thumb);
+    })
+    .catch(error);
 }
-
-function downloadBulkAnime(targetDir: string, links: RSS.rssLink[]) {
-
-    // Run the broadcast and metadata on the new episode if it could not be downloaded.
-    var _fail = function(link: RSS.rssLink) {
-        // sendNewEpisodeMessage(metadata);
-    } 
-
-    links.forEach(link => {
-        if (!link.whiteListed) {
-            log("Discarding file to not download: ", link.title);
-            _fail(link);
-            return;
-        }
-
-        log("Starting Download for: ", link);
-        downloadTorrentFromRSS(link)
-            .then(result => {
-
-                // log("Successfully Downloaded: ", metadata.name);
-
-                /*
-                ApplyAniDBMetadata(result.destination, targetDir)
-                    .then(metadata => {
-                        log("Got series metadata: ", metadata);
-                        metadata.sourceUrl = link.source;
-                        sendNewEpisodeMessage(metadata);
-                    })
-                    .catch(e => {
-                        error("Failed to get series metadata: ", e);
-                        sendNewTitle(result.name);
-                    });
-                */
-            })
-            .catch(e => {
-                error("Failed to download torrent: ", e);
-                _fail(link);
-            });
-    });
-}
-
 
 // Download a torrent from a URL
-function downloadTorrentFromRSS(link: RSS.rssLink): Promise<TorrentResult> {
-    return new Promise<TorrentResult>((resolve, reject) => {
+interface downloadTorrentWithURLOutput {
+    result: TorrentResult;
+    entry: CacheEntry;
+    metadata: EpisodeMetadata;
+}
+function downloadTorrentWithURL(entry: CacheEntry, metadata: EpisodeMetadata): Promise<downloadTorrentWithURLOutput> {
+    return new Promise<downloadTorrentWithURLOutput>((resolve, reject) => {
 
-        var pass = function(p) {
-            log("Beginning torrent download for file: ", p);
-
-            // Attempt to download torrent
-            downloadTorrent(link.destination, p, log)
-                .then(resolve)
-                .catch(reject);
-        }
-        
-        let name = link.title.slice(0, link.title.lastIndexOf("."));
         // Download .torrent file from RSS feed
-        if (link.magnet) {
+        downloadTorrentFile(Config.getDownloadDir(), entry.rssLink)
+        .then(path => {
+            log("Downloaded torrent file: ", path);
 
-            downloadMagnetFile("./torrents/" + name, link.magnet)
-                .then(pass)
-                .catch(e => {
-                    error("Failed to download Magnet file: ", e);
-                    reject(e);
-                })
-
-        } else {
-
-            downloadFile("./torrents/" + name, link.source)
-                .then(pass)
-                .catch(e => {
-                    error("Failed to download .torrent file: ", e);
-                    reject(e);
+            downloadTorrent(Config.getDownloadDir(), path, 1, null)
+            .then(r => {
+                log("Successfully downloaded torrent: ", r);
+                resolve({
+                    result: r,
+                    entry: entry,
+                    metadata: metadata
                 });
-        }
+            })
+            .catch(e => {
+                reject("Failed to download torrent: " + e);
+            });
+        })
+        .catch(e => {
+            reject("Failed to download .torrent file: " + e);
+        });
     });
 }
 
-        /* TODO: Fix file sorting
-        // Get resolved filename and episode number
-        var filename = title.replace(/^.*[\\\/]/, '');
-        let res = resolveName(filename);
-        let name = res.name;
-        let episode = res.episode;
+// Sort file based on the episode metadata
+function ApplyMetadata(mediaDir: string, type: string, metadata: EpisodeMetadata, result: TorrentResult): string {
+    type = type.toLowerCase();
+    
+    log("Attempting to download metadata and rename: ", result);
 
-        log("Searching AniDB for: " + name);
-        let id = getAnimeID(name);
-        if (!id) { 
-            reject("failed to find ID for: " + name)
-            return;
-        }
+    let series = metadata.seriesTitle.replace(/[\/\?\<\>\\\:\*\|\”]/g, "");
+    let original = result.destination;
+    let targetPath = mediaDir + type + "/" + series + "/";
+    if (!fs.existsSync(targetPath))
+        fs.mkdirSync(targetPath, {recursive:true});
 
-        // Resolve filenames and paths, rename the downloaded file to the proper series name
-        // and add the season+episode number.
-        let finalName = originalTitle;
-        let s =  `S${(season < 10) ? "0" : "" }${season}`;
-        finalName += ` - ${s}E${episode}`;
-         */
+    log("Video Directory: ", original);
+    log("Target Directory: ", targetPath);
+    
+    let ext = getFileExtension(result.destination);
+    let e = (metadata.episode < 10) ? `E0${metadata.episode}` : `E${metadata.episode}`;
+    let s = (metadata.season < 10) ? `S0${metadata.season}` : `S${metadata.season}`;
+    let filename = targetPath + `${series} - ${s}${e}${ext}`;
+
+    log("Moving: ", result.destination, " To: ", filename);
+
+    if (fs.existsSync(original)) {
+        if (!fs.existsSync(targetPath))
+            fs.mkdirSync(targetPath);
+
+        fs.renameSync(original, filename);
+
+        return filename;
+    } 
+    
+    return null;
+}
+
 
 export function ApplyFileMetadata(videoPath) {
 
@@ -332,32 +331,4 @@ export function ApplyFileMetadata(videoPath) {
     }
 
     return null;
-}
-export function ApplyAniDBMetadata(videoPath, targetDirectory): Promise<EpisodeMetadata> {
-    return new Promise<EpisodeMetadata>((resolve, reject) => {
-        log("Attempting to download metadata and rename: ", videoPath);
-
-        /*
-        AniDB.getSeriesMetadata()
-        .then(metadata => {
-            let targetPath = getFilePath(metadata.newFile);
-            log("Video Directory: ", videoPath);
-            log("Target Directory: ", targetDirectory);
-            log("Target PAth: ", targetPath);
-
-            if (fs.existsSync(videoPath)) {
-                if (!fs.existsSync(targetPath))
-                    fs.mkdirSync(targetPath);
-
-                fs.renameSync(videoPath, metadata.newFile);
-
-                resolve(metadata);
-            }
-        })
-        .catch(e => {
-            reject(e);
-        });
-        */
-
-    });
 }

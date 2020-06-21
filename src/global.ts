@@ -31,6 +31,10 @@ export function debug(...data: any[]) {
     let s: string = printf(data);
     logger.debug(s);
 }
+export function warn(...data: any[]) {
+    let s: string = printf(data);
+    logger.warn(s);
+}
 export function trace(...data: any[]) {
     let s: string = printf(data);
     logger.silly(s);
@@ -55,4 +59,7 @@ export function compareStrings(text: string, search: string): boolean {
 }
 export function escapeString(s: string): string {
     return s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+}
+export function newTimestamp(): number {
+    return Math.floor(Date.now() / 1000);
 }

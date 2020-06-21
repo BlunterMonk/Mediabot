@@ -1,0 +1,105 @@
+
+/* File Preview */
+
+.file-preview-frame {
+    margin: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.2);
+    padding: 6px;
+    text-align: center;
+    height: 50px;
+    width: 100%;
+    background-color: #393e46;
+    border-radius: 10px;
+}
+
+/* File Upload Percentage */
+
+.file-preview-upload-percent {
+    width: 10%;
+    height: 100%;
+    float: right;
+    text-align: right;
+    /* padding-top: 5px; */
+    font-size: larger;
+    /* background-color: blueviolet; */
+}
+
+/* File Preview ID */
+
+.file-preview-id {
+    width: 10%;
+    height: 100%;
+    float: left;
+    text-align: left;
+    /* padding-top: 5px; */
+    font-size: large;
+    /* background-color: orangered; */
+    /* height: 100px; */
+    line-height: 100%;
+    text-align: center;
+}
+
+
+/* File Upload Progress Text */
+
+.file-preview-progress-text {
+    height: 100%;
+    width: 100%;
+    float: left;
+    text-align: center;
+    color: white;
+    border-color: azure;
+    font-size: 14px;
+    padding: 10px;
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+    top: 0;
+    left: 0;
+    position: absolute;
+}
+
+.file-preview-progress-text span {
+    display: inline-block;
+    width: 100px;
+    text-align: left;
+}
+
+.file-preview-progress-text span:first-of-type {
+    text-align: right
+}
+
+
+
+/* File Preview Progress */
+
+.file-preview-progress {
+    padding-top: 5px;
+    padding-bottom: 5px;
+    width: 80%;
+    height: 100%;
+    float: left;
+    border-radius: 5px;
+    position: relative;
+    /* background-color: chartreuse; */
+}
+
+.file-preview-progress-bar {
+    border-radius: 5px;
+    /* float: none; */
+    font-family: Verdana, Helvetica, sans-serif;
+    font-size: 9px;
+}
+
+.file-preview-progress-bar-background {
+    width: 100%;
+    background-color: #e9ecef;
+    height: 100%;
+    border-radius: 5px;
+}
+
+.progress {
+    height: 100%;
+}
+.progress-bar {
+    background-color: lightskyblue;
+}

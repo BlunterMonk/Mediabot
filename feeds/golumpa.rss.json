@@ -1,0 +1,20 @@
+{
+	"source": "https://nyaa.si/?page=rss&q=%5Bgolumpa%5D&c=1_0&f=0",
+	"enabled": false,
+	"type": "Anime",
+	"targetDirectory": "D:\\Funimation\\",
+	"interval": 10,
+	"ignoreList": [
+		"720p"
+	],
+	"whiteList": [
+		"my hero",
+		"iruma"
+	],
+	"acceptList": [
+		{
+			"filter": "golumpa*1080p",
+			"destination": "D:/_episodes"
+		}
+	]
+}

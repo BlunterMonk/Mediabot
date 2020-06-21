@@ -8,7 +8,7 @@ import "../util/string-extension.js";
 import TVDB from 'node-tvdb';
 import * as fs from "fs";
 import * as https from "https";
-import { log, error, debug, trace } from "../global.js";
+import { log, error, debug, trace, newTimestamp } from "../global.js";
 import { downloadFile, downloadFileIfNotExist, getFileExtension, getFilePath } from "../util/download.js";
 import { SearchInfo, EpisodeMetadata, SeriesMetadata } from "./db.js";
 import { Config } from "../config/config";
@@ -22,12 +22,13 @@ const thumbEndpoint = "https://artworks.thetvdb.com/banners/";
 const seriesKeysFilename = "./data/tvdb-metadata/keys.json";
 const epiReg = new RegExp("S([0-9]+)E([0-9]+)");
 
-function getMetadataPath() { return `${Config.getCacheDir()}tvdb-metadata/`; };
+export function getMetadataPath() { return `${Config.getCacheDir()}tvdb-metadata/`; };
 
 //////////////////////////////////////////////////
 // CACHED DATA
 
 export function getEpisodeThumbnail(seriesId: string, episodeId: string): string {
+    return `${getMetadataPath()}${seriesId}/thumb_${episodeId}.jpg`;
     let p = `${getMetadataPath()}${seriesId}/thumb_${episodeId}.jpg`;
     if (!fs.existsSync(p))
         return null;
@@ -35,6 +36,7 @@ export function getEpisodeThumbnail(seriesId: string, episodeId: string): string
     return p;
 }
 export function getSeriesPoster(seriesId: string): string {
+    return `${getMetadataPath()}${seriesId}/poster.jpg`;
     let p = `${getMetadataPath()}${seriesId}/poster.jpg`;
     if (!fs.existsSync(p))
         return null;
@@ -42,6 +44,7 @@ export function getSeriesPoster(seriesId: string): string {
     return p;
 }
 export function getSeriesBanner(seriesId: string): string {
+    return `${getMetadataPath()}${seriesId}/banner.jpg`;
     let p = `${getMetadataPath()}${seriesId}/banner.jpg`;
     if (!fs.existsSync(p))
         return null;
@@ -131,6 +134,7 @@ export function getTVDBMetadata(info: SearchInfo): Promise<EpisodeMetadata> {
                         thumb: current.filename,
                         season: current.airedSeason,
                         episode: current.airedEpisodeNumber,
+                        absEpisode: current.absoluteNumber,
                         overview: current.overview,
                         seriesId: current.seriesId,
                         seriesTitle: info.title
@@ -203,6 +207,7 @@ function cacheMetadata(series: SeriesMetadata): Promise<string> {
             error("Failed to download series banner: ", imageEndpoint + series.banner, " error: ", e);
         }); 
 
+        series.lastUpdated = newTimestamp();
         tvdb.getEpisodesBySeriesId(series.id)
         .then(episodes => {
 
@@ -216,6 +221,7 @@ function cacheMetadata(series: SeriesMetadata): Promise<string> {
                     thumb: ep.filename,
                     season: ep.airedSeason,
                     episode: ep.airedEpisodeNumber,
+                    absEpisode: ep.absoluteNumber,
                     overview: ep.overview,
                     seriesId: ep.seriesId,
                     seriesTitle: series.seriesName

@@ -13,7 +13,8 @@
   
   <!-- JQuery -->
   <script src="jquery-3.5.1.min.js"></script>
-  <script src="index.js"></script>
+  <script src="download.js"></script>
+
   
   <!-- Bootstrap core CSS -->
   <link href="/css/bootstrap.css" rel="stylesheet">
@@ -34,13 +35,8 @@
         font-size: 3.5rem;
       }
     }
-
-
   </style>
 
-<script>
-
-  </script>
   <!-- Custom styles for this template -->
   <link href="cover.css" rel="stylesheet">
 </head>
@@ -51,23 +47,39 @@
       <div class="inner">
         <h3 class="masthead-brand">Mediabot</h3>
         <nav class="nav nav-masthead justify-content-center">
-          <a class="nav-link active" href="index.html">Home</a>
-          <a class="nav-link" href="download.html">Download</a>
+          <a class="nav-link" href="index.html">Home</a>
+          <a class="nav-link active" href="download.html">Download</a>
           <a class="nav-link" href="status.html">Status</a>
         </nav>
       </div>
-      <img id="refresh-button" src="icons/Search.png" />
     </header>
 
     <main role="main" class="inner cover">
-      <div class="feed">
-      </div>
+        <div class="download-form">
+            <form id="download-form">
+                <div class="form-group">
+                    <label for="type-select">Video Type</label>
+                    <select class="form-control form-control-lg" id="download-form-type-select">
+                        <option>Movie</option>
+                        <option>TV</option>
+                        <option>Anime</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                <label for="url-input">URL</label>
+                <input id="download-form-url-input" type="text" class="form-control" aria-describedby="urlHelp" placeholder="Enter torrent URL">
+                <small id="urlHelp" class="form-text text-muted">Enter the Torrent download URL or the Magnet link</small>
+                </div>
+                <div class="form-group">
+                    <button id="download-form-submit-button" type="submit" class="btn btn-primary">Download</button>
+                </div>
+            </form>
+        </div>
     </main>
 
     <footer class="mastfoot mt-auto">
       <div class="inner">
-        <p>Cover template for <a href="https://getbootstrap.com/">Bootstrap</a>, by <a
-            href="https://twitter.com/mdo">@mdo</a>.</p>
+        <p></p>
       </div>
     </footer>
   </div>

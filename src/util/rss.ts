@@ -15,7 +15,7 @@ const cacheFile = `./data/downloads.json`;
 
 let parser = new Parser();
 
-type OnUpdate = ((targetDir: string, links: rssLink[]) => void);
+type OnUpdate = ((mediaType: string, links: rssLink[]) => void);
 interface torrentFilter {
     filter: string; // Regex match performed on the raw titles found in the feed
     replace?: string; // Regex replace performed on the titles before returned
@@ -24,6 +24,7 @@ interface torrentFilter {
 interface rssConfig {
     source: string; // RSS feed source URL
     enabled: boolean; // Should the RSS feed be active on startup
+    type: string; // Types of videos present in this feed ('TV', 'Anime')
 	targetDirectory: string; // parent target for sorting shows
     interval: number; // interval to read from RSS stream in seconds
     ignoreList: string[]; // list of tags to ignore
@@ -48,11 +49,12 @@ export class RSSFeed {
     filename: string;
     configuration: rssConfig;
     readerInterval: any;
+    updateMethod: OnUpdate;
     constructor(filename: string) {
         this.filename = filename;
         this.reload();
     }
-    startReading(onUpdate: OnUpdate) {
+    async startReading(onUpdate: OnUpdate) {
         if (!this.configuration.enabled) {
             debug("RSS Feed Disabled: ", this.filename);
             return;
@@ -60,6 +62,7 @@ export class RSSFeed {
 
         this.stopReading();
 
+        this.updateMethod = onUpdate;
         this.updateFeed(onUpdate);
         this.readerInterval = setInterval(() => {
             this.updateFeed(onUpdate);
@@ -73,6 +76,10 @@ export class RSSFeed {
     }
     reload() {
         this.configuration = JSON.parse(fs.readFileSync(this.filename).toString());
+        let t = this.configuration.type.toLowerCase();
+        if (t != "anime" && t != "tv") {
+            error(`CONFIGURATION ERROR: RSS feed ${this.filename} has an invalid Type: ${t}`);
+        }
     }
     save() {
         fs.writeFileSync(this.filename, JSON.stringify(this.configuration, null, "\t"));
@@ -85,6 +92,12 @@ export class RSSFeed {
         return this.configuration.targetDirectory;
     }
 
+    update() {
+        if (this.updateMethod == null) 
+            return;
+
+        this.updateFeed(this.updateMethod);
+    }
     updateFeed(onUpdate: OnUpdate) {
         readFeed(this.configuration.source, this.configuration.acceptList, this.configuration.ignoreList)
         .then(items => {
@@ -101,10 +114,11 @@ export class RSSFeed {
                 if (downloadList[title])
                     return;
 
-                let m = item.content.match(/\"(magnet.*?)\"/g);
+                let r = new RegExp(/\"(magnet.*?)\"/, "g");
+                let m = r.exec(item.content);
                 let mag = null;
-                if (m && m.length > 0)
-                    mag = m[0];
+                if (m && m.length > 1)
+                    mag = m[1];
 
                 const entry = this.configuration.whiteList.find((v, i) => {
                     return compareStrings(item.title, v)
@@ -123,7 +137,7 @@ export class RSSFeed {
             });
 
             if (links.length > 0) {
-                onUpdate(this.getTargetDirectory(), links);
+                onUpdate(this.configuration.type, links);
             }
 
             fs.writeFileSync(`./data/downloads.json`, JSON.stringify(downloadList, null, "\t"));
@@ -190,6 +204,11 @@ class rssManager {
     }
 
     init() {
+        if (!fs.existsSync("./data/feeds/")) {
+            log("No RSS feeds found");
+            return;
+        }
+
         let files = fs.readdirSync("./data/feeds/");
         files.forEach(file => {
 
@@ -203,6 +222,20 @@ class rssManager {
             this.rssFeeds[name] = feed;
         });
     }
+    startAll(onAnimeUpdate: OnUpdate, onTVUpdate: OnUpdate) {
+        Object.keys(this.rssFeeds).forEach(key => {
+            switch (this.rssFeeds[key].configuration.type.toLowerCase()) {
+                case "anime":
+                    this.rssFeeds[key].startReading(onAnimeUpdate);
+                    break;
+                case "tv":
+                    this.rssFeeds[key].startReading(onTVUpdate);
+                    break;
+                default:
+                    break;
+            }
+        })
+    }
     startReading(feed: string, onUpdate: OnUpdate) {
         if (!this.rssFeeds[feed])
             return;
@@ -211,9 +244,9 @@ class rssManager {
     }
 
     updateFeeds() {
-        // Object.keys(this.rssFeeds).forEach((v, i) => {
-        //     this.rssFeeds[v].updateFeed();
-        // });
+        Object.keys(this.rssFeeds).forEach((v, i) => {
+            this.rssFeeds[v].update();
+        });
     }
 
     getSettings(feed: string): rssConfig {
@@ -266,22 +299,15 @@ async function readFeed(source: string, acceptList: torrentFilter[], ignoreList:
             const filter = acceptList[index].filter;
             const title = item.title.toLowerCase();
 
-            debug("Compare: ", title, " <-> ", filter);
+            trace("Compare: ", title, " <-> ", filter);
             if (compareStrings(title, filter)) {
-                debug("Adding Item from RSS feed: ", item.title, " url: ", item.link);
                 if (acceptList[index].replace) {
                     let o = item.title;
                     let n = item.title.replace(new RegExp(acceptList[index].replace), "");
-                    debug("Item Title changed: ", o, " -> ", n);
+                    trace("Item Title changed: ", o, " -> ", n);
                     item.title = n;
                 }
-                //for (let i = 0; i < whiteList.length; i++) {
-                //    const e = whiteList[i];
-                //    if (compareStrings(title, e)) {
-                //        item.link = null;
-                //        break;
-                //    }
-                //}
+                trace("Adding Item from RSS feed: ", item.title, " url: ", item.link);
 
                 links.push({
                     link: item.link,
@@ -289,7 +315,6 @@ async function readFeed(source: string, acceptList: torrentFilter[], ignoreList:
                     content: item.content,
                     destination: acceptList[index].destination
                 });
-                debug("Total Links: ", links.length);
                 return;
             }
         }

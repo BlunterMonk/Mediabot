@@ -1,8 +1,9 @@
 {
     "name": "Mediabot",
     "logLevel": "silly",
-    "downloadDir": "./downloads/",
-    "mediaDir": "/Users/dahmitristephenson/Movies/",
-    "cacheDir": "./data/",
-    "cacheLimit": 25
+    "downloadDir": "/home/pi/Downloads/",
+    "mediaDir": "/home/pi/Videos/",
+    "cacheDir": "/home/pi/Mediabot/data/",
+    "cacheLimit": 25,
+    "cacheTimer": 144
 }

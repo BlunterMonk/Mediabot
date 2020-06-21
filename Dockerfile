@@ -3,6 +3,7 @@ FROM node:lts-alpine
 WORKDIR /app
 
 RUN apk add --no-cache bash
+RUN apk add --no-cache aria2
 
 RUN npm install -g pm2
 
